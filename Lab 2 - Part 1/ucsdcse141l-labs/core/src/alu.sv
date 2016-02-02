@@ -33,7 +33,7 @@ module alu (
             kBLTZ:  jump_now_o = ($signed(rd_i)<$signed(32'd0))    ? 1'b1  : 1'b0;
 				
 				// Left Bitwise Rotate
-				kROL:   result_o   = (rd_i << rs_i[4:0])|(rd_i >> ~rs_i[4:0]);
+				kROL:   result_o   = (rd_i >> ~rs_i[4:0])|(rd_i << rs_i[4:0]);
             
             kMOV, kLW, kLBU, kJALR, kBAR:  
                 begin
