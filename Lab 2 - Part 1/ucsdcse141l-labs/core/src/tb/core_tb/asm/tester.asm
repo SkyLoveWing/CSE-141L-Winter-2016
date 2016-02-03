@@ -284,9 +284,9 @@ MOV   $R6,%SRLV_ANS
 JALR  $R1,%CHECK
 
 // Test for ROL (Left Bitwise Rotate)
-.const %ROL_ANS, 0x22200000
-.const %ROL_VAR_A, 0x11100000
-.const %ROL_VAR_B, 0x00000001
+.const %ROL_ANS, 0x65432187
+.const %ROL_VAR_A, 0x87654321
+.const %ROL_VAR_B, 0x00000008
 ADDU  $R5,%ONE
 MOV   $R7,%ROL_VAR_A
 MOV   $R2,%ROL_VAR_B

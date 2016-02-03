@@ -17,7 +17,7 @@
 -- PROGRAM "Quartus II 64-Bit"
 -- VERSION "Version 15.0.0 Build 145 04/22/2015 SJ Web Edition"
 
--- DATE "02/01/2016 16:38:31"
+-- DATE "02/01/2016 22:42:34"
 
 -- 
 -- Device: Altera EP4CE40F29C6 Package FBGA780
@@ -38,9 +38,9 @@ ENTITY 	simple_core IS
     PORT (
 	clk : IN std_logic;
 	n_reset : IN std_logic;
-	alu_result_o : OUT std_logic_vector(31 DOWNTO 0);
-	alu_result_valid_o : OUT std_logic;
-	stop_o : OUT std_logic
+	alu_result_o : BUFFER std_logic_vector(31 DOWNTO 0);
+	alu_result_valid_o : BUFFER std_logic;
+	stop_o : BUFFER std_logic
 	);
 END simple_core;
 

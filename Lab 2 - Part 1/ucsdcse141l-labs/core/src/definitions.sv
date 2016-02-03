@@ -40,8 +40,8 @@ package definitions;
     const logic [15:0]kSW    = 16'b11010_?????_??????;
     const logic [15:0]kSB    = 16'b11011_?????_??????;
     // 28
-    // 29
 	 
+	 // 29
 	 // Left Bitwise Rotate
 	 const logic [15:0]kROL   = 16'b11101_?????_??????;
     // 30
@@ -71,7 +71,7 @@ package definitions;
         LBU         = 5'h19,
         SW          = 5'h1A,
         SB          = 5'h1B,
-		  ROL			  = 5'h1C,	// Left Bitwise Rotate
+		  ROL			  = 5'h1D,	// Left Bitwise Rotate
         BARR,
         NOP
     } op_mne;

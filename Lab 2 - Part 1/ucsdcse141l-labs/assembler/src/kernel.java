@@ -70,7 +70,7 @@ class kernel{
     /** An enumuration for opcodes */
     public static enum opcodes {
 		ADDU, SUBU, SLLV, SRAV, SRLV, AND, OR, NOR, SLT, SLTU, MOV, LW, LBU, SW, SB, JALR,
-        BEQZ, BNEQZ, BGTZ, BLTZ,
+        BEQZ, BNEQZ, BGTZ, BLTZ, ROL,
         DONE, BAR, NOTVALID;
   
     /** gets an String as opcode and outputs the corresponding opcode in form of the used enumeration. */
@@ -110,6 +110,8 @@ class kernel{
 		opcodeTable.put("BLTZ" , "10011");
 		opcodeTable.put("DONE" , "01100");
 		opcodeTable.put("BAR"  , "01100");
+		// Rotate Left Bitwise
+		opcodeTable.put("ROL"  , "11101");
 	}
 
 
@@ -141,6 +143,7 @@ class kernel{
             case SW:
             case SB:
             case MOV:
+	    case ROL:
 				if (instruction.operands.length!=2){
                     System.out.println("invalid number of operands in the following instruction");
                     instruction.print();
