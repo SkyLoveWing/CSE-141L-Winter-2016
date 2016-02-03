@@ -1,16 +1,16 @@
-# ModelSim 10.4b bug: need to delete library if it already exists because vlib work will
-# seg fault otherwise.  
+#Edited by Adam
 if {[file isdirectory work]} {
-    vdel -all -lib work
+	vdel -all -lib work
 }
 
-# Create library
-vlib work
+#create library
+vlib work 
 
-# Compile .sv files
+#compile .sv files
+>>>>>>> origin/master
 vlog -work work "../simple_definitions.sv"
 vlog -work work "../simple_alu.sv"
 vlog -work work "../simple_core.sv"
 vlog -work work "../simple_imem.sv"
 vlog -work work "../simple_reg_file.sv"
-vlog -work work "simple_core_tb.sv" 
+vlog -work work "simple_core_tb.sv"
