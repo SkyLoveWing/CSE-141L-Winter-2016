@@ -502,6 +502,7 @@ CH:
     NOR  $R5, $R5  // ~X
     AND  $R1, $R2  // X and Y
     AND  $R5, $R3  // ~X and Z
+
     XOR  $R1, $R5	// XOR Translated implementation
     MOV  $R4, $R1	// Required 2 MOV, and a JALR
     JALR $R31, $R30	// Other instructions were defined via definitions.sv
@@ -517,8 +518,10 @@ MAJ:
    AND  $R5, $R2 // XY
    AND  $R6, $R3 // YZ
    AND  $R1, $R3 // XZ
+
    XOR  $R1, $R5	// XOR Translated implementation
    XOR  $R1, $R6	// XOR Translated implementation
+
    MOV  $R4, $R1	// Required 2 MOV, and a JALR
    JALR $R31, $R30	// Other instructions were defined via definitions.sv
 
@@ -531,12 +534,15 @@ BIGSIG0:
     MOV  $R4, $R1
     MOV  $R8, %S3
     ADDU $R8, %S3
+
     ADDU $R8, %S7	// ROR Translated implementation
     ROR $R4, $R8	// term 2
     MOV  $R9, $R1
     MOV  $R8, %S11
+
     ADDU $R8, %S11	// ROR Translated implementation
     ROR $R9, $R8	// term 3
+
     XOR  $R9, $R4	// XOR Translated implementation
     XOR  $R9, $R3	// XOR Translated implementation
     MOV  $R2, $R9
@@ -551,12 +557,15 @@ BIGSIG1:
     MOV  $R8, %S3
     ADDU $R8, %S3	// ROR Translated implementation
     ROR $R3, $R8	// term 1
+
     MOV  $R4, $R1	// ROR Translated implementation
     ROR $R4, %S11	// term 2
     MOV  $R9, $R1
+
     MOV  $R8, %S18
     ADDU $R8, %S7	// ROR Translated implementation
     ROR $R9, $R8	// term 3
+
     XOR  $R9, $R4	// XOR Translated implementation
     XOR  $R9, $R3	// XOR Translated implementation
     MOV  $R2, $R9
@@ -568,11 +577,14 @@ BIGSIG1:
 SMSIG0:
     MOV  $R3, $R1	// ROR Translated implementation
     ROR $R3, %S7	// term 1
+
     MOV  $R9, $R1	// ROR Translated implementation
     ROR $R9, %S18	// term 2
+
     XOR  $R9, $R3	// XOR Translated implementation
     MOV  $R8, $R1
     SRLV $R8, %S3
+
     XOR  $R9, $R8	// XOR Translated implementation
     MOV  $R2, $R9
     JALR $R31, $R30	// Other instructions were defined via definitions.sv
@@ -584,11 +596,14 @@ SMSIG0:
 SMSIG1:
     MOV  $R3, $R1	// ROR Translated implementation
     ROR $R3, %S17	// term 1
+
     MOV  $R9, $R1	// ROR Translated implementation
     ROR $R9, %S19	// term 2
+
     XOR  $R9, $R3	// XOR Translated implementation
     MOV  $R8, $R1
     SRLV $R8, %S10
+
     XOR  $R9, $R8	// XOR Translated implementation
     MOV  $R2, $R9
     JALR $R31, $R30	// Other instructions were defined via definitions.sv
