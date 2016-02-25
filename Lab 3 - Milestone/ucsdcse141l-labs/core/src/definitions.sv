@@ -170,4 +170,18 @@ package definitions;
     } debug_s;
     
     //`endif
+	 
+	 // Pipeline
+	 // Derived logic units from cl_decode.sv
+	 // Helps define the logic for all states
+	typedef struct packed {
+			instruction_s instruction;
+	
+			logic is_load_op;
+			logic op_writes_rf;
+			logic is_store_op;
+			logic is_mem_op;
+			logic is_byte_op;
+	} pipeline;
+
 endpackage // defintions

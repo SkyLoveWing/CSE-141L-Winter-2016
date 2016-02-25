@@ -59,7 +59,7 @@ module alu (
         endcase
     
         // Set symbolic opcode
-        op_mnemonic = op_mne'(op_i.opcode);
+        /*op_mnemonic = op_mne'(op_i.opcode);
         if (op_i ==? kBAR)
             begin
             op_mnemonic = BARR;
@@ -67,7 +67,7 @@ module alu (
         else if ((op_i.opcode == 0) && (rd_i == 0) && (rs_i == 0))
             begin
             op_mnemonic = NOP;
-        end
+        end*/
     
     end // always_comb
     
