@@ -36,10 +36,10 @@ module core #(
                                 imm_jump_add;
                                 
     // Ins. memory output
-    instruction_s instruction, imem_out;
+    instruction_s instruction,instructionQ,instructionQs, imem_out;
     
     // Result of ALU, Register file outputs, Data memory output data
-    logic [31:0] alu_result, rs_val_or_zero, rd_val_or_zero, rs_val, rd_val;
+    logic [31:0] alu_result, rs_val_or_zero, rd_val_or_zero, rs_val, rd_val, rs_val_or_zeroQs, rs_val_or_zeroQ,rd_val_or_zeroQ,rd_val_or_zeroQs;
     
     // Reg. File address
     logic [($bits(instruction.rs_imm))-1:0] rd_addr;
@@ -54,7 +54,7 @@ module core #(
     // controller output signals
     logic is_load_op_c,  op_writes_rf_c, valid_to_mem_c,
         is_store_op_c, is_mem_op_c,    PC_wen,
-        is_byte_op_c;
+        is_byte_op_c, PC_wen_r;
     
     // Handshak protocol signals for memory
     logic yumi_to_mem_c;
@@ -189,14 +189,22 @@ module core #(
                     ? (net_packet_i.net_addr [0+:($bits(instruction.rs_imm))])
                     : ({{($bits(instruction.rs_imm)-$bits(instruction.rd)){1'b0}}
                         ,{instruction.rd}});
-    
+								
+    always_ff @(posedge clk)	   // FD pipe
+		if(!n_reset) begin	   // TODO -- reset condition? 
+			instructionQs   	<=	0;
+		end
+		else begin		// TODO  -- enable/stall?
+			instructionQs   	<=	instruction;   
+	end
+	
     // Register file
     reg_file #(
-            .addr_width_p($bits(instruction.rs_imm))
+            .addr_width_p($bits(instructionQs.rs_imm))
         )
         rf (
             .clk(clk),
-            .rs_addr_i(instruction.rs_imm),
+            .rs_addr_i(instructionQs.rs_imm),
             .rd_addr_i(rd_addr),
             .w_addr_i(rd_addr),
             .wen_i(rf_wen),
@@ -208,11 +216,26 @@ module core #(
     assign rs_val_or_zero = instruction.rs_imm ? rs_val : 32'b0;
     assign rd_val_or_zero = rd_addr            ? rd_val : 32'b0;
     
+	 always_ff @(posedge clk)	   // DX pipe
+		if(!n_reset) begin	   // TODO -- reset condition? 
+			rd_val_or_zeroQ	<=	0;
+			rs_val_or_zeroQ	<=	0;
+			instructionQ   	<=	0; 
+		end
+		else begin		// TODO  -- enable/stall?
+			rd_val_or_zeroQ	<=	rd_val_or_zero;
+			rs_val_or_zeroQ	<=	rs_val_or_zero;
+			instructionQ   	<=	instruction;   
+	end
+	//assign rd_val_or_zeroQs  =	instruction.rs_imm ? 	 rd_val_or_zero :	  rd_val_or_zeroQ;
+	//assign rs_val_or_zeroQs	 =	rd_addr?                 rs_val_or_zero :	  rs_val_or_zeroQ;
+   //assign instructionQs   	 =	imem_addr?	 				 instruction    :     instructionQ   ;
+
     // ALU
     alu alu_1 (
-            .rd_i(rd_val_or_zero),
-            .rs_i(rs_val_or_zero),
-            .op_i(instruction),
+            .rd_i(rd_val_or_zeroQ),
+            .rs_i(rs_val_or_zeroQ),
+            .op_i(instructionQ),
             .result_o(alu_result),
             .jump_now_o(jump_now)
         );
