@@ -7,17 +7,19 @@ module reg_file  #(
         input clk,
         input [addr_width_p-1:0] rs_addr_i,
         input [addr_width_p-1:0] rd_addr_i,
-        input [addr_width_p-1:0] w_addr_i,
+        input [addr_width_p-1:0] w_addr_i, 
         input wen_i,
         input [data_width_p-1:0] w_data_i,
         output logic [data_width_p-1:0] rs_val_o,
         output logic [data_width_p-1:0] rd_val_o
     );
 
-    logic [data_width_p-1:0] RF [0:2**addr_width_p-1];
+    logic [data_width_p-1:0] RF [2**addr_width_p-1:0];
 
     assign rs_val_o = RF [rs_addr_i];
     assign rd_val_o = RF [rd_addr_i];
+	 
+	 
 
     always_ff @ (posedge clk)
         begin
@@ -26,4 +28,7 @@ module reg_file  #(
             RF [w_addr_i] <= w_data_i;
         end     
     end
+	 
+	 
+	 
 endmodule

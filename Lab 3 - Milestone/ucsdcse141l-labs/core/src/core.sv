@@ -32,20 +32,24 @@ module core #(
     //---- Adresses and Data ----//
     // Ins. memory address signals
     logic [imem_addr_width_p-1:0] PC_r, PC_n,
-                                pc_plus1, imem_addr,
+                                pc_plus1, pc_plus1_mem_wb, imem_addr,
                                 imm_jump_add;
                                 
     // Ins. memory output
-    instruction_s instruction,instructionQ,instructionQs, imem_out;
+    instruction_s instruction, imem_out, instruction_r;
+	 
+	 mem_out_s from_mem_wb_i; 
+	 
+	 logic nop_n, nop_r; 
     
     // Result of ALU, Register file outputs, Data memory output data
-    logic [31:0] alu_result, rs_val_or_zero, rd_val_or_zero, rs_val, rd_val, rs_val_or_zeroQs, rs_val_or_zeroQ,rd_val_or_zeroQ,rd_val_or_zeroQs;
+    logic [31:0] alu_result, rs_val_or_zero, rd_val_or_zero, rs_val, rd_val, alu_result_mem_wb;
     
     // Reg. File address
     logic [($bits(instruction.rs_imm))-1:0] rd_addr;
     
     // Data for Reg. File signals
-    logic [31:0] rf_wd;
+    logic [31:0] rf_wd, f_bypass;
     
     //---- Control signals ----//
     // ALU output to determin whether to jump or not
@@ -69,7 +73,7 @@ module core #(
     // Memory stages and stall signals
     dmem_req_state mem_stage_r, mem_stage_n;
     
-    logic stall, stall_non_mem;
+    logic stall, stall_non_mem, bypass_byp;
     
     // Exception signal
     logic exception_n;
@@ -81,8 +85,18 @@ module core #(
     instruction_s net_instruction;
     logic [mask_length_gp-1:0] barrier_r,      barrier_n,
                             barrier_mask_r, barrier_mask_n;
+									 
+	 
+	 //pipelines declarations
+	 pipeline fd_r, fd_n, mem_wb_r, mem_wb_n; 
     
     //---- Connection to external modules ----//
+	 
+	 assign f_bypass = rf_wd; 
+	 
+	 assign fd_n.instruction = (!stall) ? instruction: fd_r.instruction; 
+	 assign mem_wb_n = (!stall) ? fd_r : mem_wb_r; 
+	 
     
     // Suppress warnings
     assign net_packet_o = net_packet_i;
@@ -91,10 +105,10 @@ module core #(
     assign debug_o = {PC_r, instruction, state_r, barrier_mask_r, barrier_r};
     
     // Update the PC if we get a PC write command from network, or the core is not stalled.
-    assign PC_wen = (net_PC_write_cmd_IDLE || !stall);
+    assign PC_wen = (net_PC_write_cmd_IDLE || !stall && !nop_n);
     
     // Program counter
-    always_ff @ (posedge clk)
+    /*always_ff @ (posedge clk)
         begin
         if (!n_reset)
             begin
@@ -108,10 +122,10 @@ module core #(
             end
         end
     end
-    
+    */
     // Determine next PC
     assign pc_plus1     = PC_r + 1'b1;  // Increment PC.
-    assign imm_jump_add = $signed(instruction.rs_imm) + $signed(PC_r);  // Calculate possible branch address.
+    assign imm_jump_add = $signed(fd_r.instruction.rs_imm) + $signed(PC_r);  // Calculate possible branch address.
     
     // Next PC is based on network or the instruction
     always_comb
@@ -130,7 +144,7 @@ module core #(
             end
         else
             begin
-            unique casez (instruction)
+            unique casez (fd_r.instruction)
                 // On a JALR, jump to the address in RS (passed via alu_result).
                 kJALR:
                     begin
@@ -153,14 +167,11 @@ module core #(
     end
     
     // Selection between network and core for instruction address
-    assign imem_addr = (net_imem_write_cmd) ? net_packet_i.net_addr
-                                        : PC_n;
+   // assign imem_addr = (net_imem_write_cmd) ? net_packet_i.net_addr   : PC_n;
                                         
     // Instruction memory
     instr_mem #(
-            .addr_width_p(imem_addr_width_p)
-        ) 
-        imem (
+            .addr_width_p(imem_addr_width_p)) imem (
             .clk(clk),
             .addr_i(imem_addr),
             .instruction_i(net_instruction),
@@ -169,11 +180,11 @@ module core #(
         );
     
     // Since imem has one cycle delay and we send next cycle's address, PC_n
-    assign instruction = imem_out;
+    assign instruction = (PC_wen_r) ? imem_out : (nop_r) ? 16'b1111111111111111 : (stall) ? instruction_r : instruction;
     
     // Decode module
     cl_decode decode (
-        .instruction_i(instruction),
+        .instruction_i(fd_r.instruction),
         .is_load_op_o(is_load_op_c),
         .op_writes_rf_o(op_writes_rf_c),
         .is_store_op_o(is_store_op_c),
@@ -190,52 +201,77 @@ module core #(
                     : ({{($bits(instruction.rs_imm)-$bits(instruction.rd)){1'b0}}
                         ,{instruction.rd}});
 								
-    always_ff @(posedge clk)	   // FD pipe
+   /* always_ff @(posedge clk)	   // FD pipe
 		if(!n_reset) begin	   // TODO -- reset condition? 
 			instructionQs   	<=	0;
 		end
 		else begin		// TODO  -- enable/stall?
 			instructionQs   	<=	instruction;   
-	end
+	end */
 	
     // Register file
-    reg_file #(
-            .addr_width_p($bits(instructionQs.rs_imm))
-        )
-        rf (
-            .clk(clk),
-            .rs_addr_i(instructionQs.rs_imm),
-            .rd_addr_i(rd_addr),
-            .w_addr_i(rd_addr),
-            .wen_i(rf_wen),
-            .w_data_i(rf_wd),
-            .rs_val_o(rs_val),
-            .rd_val_o(rd_val)
+    reg_file #(.addr_width_p($bits(instruction.rs_imm))) rf
+	     (.clk(clk),
+          .rs_addr_i(fd_r.instruction.rs_imm),
+          .rd_addr_i(rd_addr),
+          .w_addr_i(rd_addr),
+          .wen_i(rf_wen),
+          .w_data_i(rf_wd),
+          .rs_val_o(rs_val),
+          .rd_val_o(rd_val)
         );
     
-    assign rs_val_or_zero = instruction.rs_imm ? rs_val : 32'b0;
-    assign rd_val_or_zero = rd_addr            ? rd_val : 32'b0;
+    //assign rs_val_or_zero = instruction.rs_imm ? rs_val : 32'b0;
+   // assign rd_val_or_zero = rd_addr            ? rd_val : 32'b0;
     
-	 always_ff @(posedge clk)	   // DX pipe
+	/* always_ff @(posedge clk, negedge n_reset)	   // DX pipe
 		if(!n_reset) begin	   // TODO -- reset condition? 
+		   
 			rd_val_or_zeroQ	<=	0;
 			rs_val_or_zeroQ	<=	0;
 			instructionQ   	<=	0; 
 		end
 		else begin		// TODO  -- enable/stall?
 			rd_val_or_zeroQ	<=	rd_val_or_zero;
+			bypass_byp <= (!stall); 
 			rs_val_or_zeroQ	<=	rs_val_or_zero;
 			instructionQ   	<=	instruction;   
 	end
-	//assign rd_val_or_zeroQs  =	instruction.rs_imm ? 	 rd_val_or_zero :	  rd_val_or_zeroQ;
-	//assign rs_val_or_zeroQs	 =	rd_addr?                 rs_val_or_zero :	  rs_val_or_zeroQ;
-   //assign instructionQs   	 =	imem_addr?	 				 instruction    :     instructionQ   ;
+	assign rd_val_or_zeroQs  =	(!stall)?	             rd_val_or_zero :	  rd_val_or_zeroQ;
+	assign rs_val_or_zeroQs	 =	(!stall)?               rs_val_or_zero :	  rs_val_or_zeroQ;
+   assign instructionQs   	 =	(!stall)?	 				 instruction    :     instructionQ;
+	
+	*/
+	
+	always_comb begin 
+		if (fd_r.instruction.rs_imm == mem_wb_r.instruction.rd) begin
+			rs_val_or_zero = f_bypass; 
+		end
+		
+		else if (fd_r.instruction.rs_imm) begin 
+			rs_val_or_zero = rs_val; 
+		end
+		else begin
+			rs_val_or_zero = 32'b0; 
+		end 
+	 end 
+	 always_comb begin 
+       if(fd_r.instruction.rd == mem_wb_r.instruction.rd) begin 
+		    rd_val_or_zero = f_bypass;
+  	 end 
+	 else if(rd_addr) begin 
+	    rd_val_or_zero = rd_val; 
+	 end 
+	 else begin 
+	    rd_val_or_zero = 32'b0;
+	 end 
+   end 
 
     // ALU
     alu alu_1 (
-            .rd_i(rd_val_or_zeroQ),
-            .rs_i(rs_val_or_zeroQ),
-            .op_i(instructionQ),
+            .rd_i(rd_val_or_zero),
+            .rs_i(rs_val_or_zero),
+            .op_i(fd_r.instruction),
             .result_o(alu_result),
             .jump_now_o(jump_now)
         );
@@ -287,7 +323,7 @@ module core #(
     end
     
     // If either the network or instruction writes to the register file, set write enable.
-    assign rf_wen = (net_reg_write_cmd || (op_writes_rf_c && !stall));
+    assign rf_wen = (net_reg_write_cmd || (mem_wb_r.op_writes_rf && !stall));
     
     // Select the write data for register file from network, the PC_plus1 for JALR,
     // data memory or ALU result
@@ -299,19 +335,19 @@ module core #(
             rf_wd = net_packet_i.net_data;
             end
         // On a JALR, we want to write the return address to the destination register.
-        else if (instruction ==? kJALR) // TODO: this is written poorly. 
+        else if (mem_wb_r.instruction ==? kJALR) // TODO: this is written poorly. 
             begin
             rf_wd = pc_plus1;
             end
         // On a load, we want to write the data from data memory to the destination register.
-        else if (is_load_op_c)
+        else if (mem_wb_r.is_load_op)
             begin
-            rf_wd = from_mem_i.read_data;
+            rf_wd = from_mem_wb_i.read_data;
             end
         // Otherwise, the result should be the ALU output.
         else
             begin
-            rf_wd = alu_result;
+            rf_wd = alu_result_mem_wb;
         end
     end
     
@@ -320,17 +356,24 @@ module core #(
         begin
         if (!n_reset)
             begin
+				PC_r            <= 0;
             barrier_mask_r  <= {(mask_length_gp){1'b0}};
             barrier_r       <= {(mask_length_gp){1'b0}};
             state_r         <= IDLE;
+				instruction_r   <= 0; 
+				PC_wen_r        <= 0; 
             exception_o     <= 0;
             mem_stage_r     <= DMEM_IDLE;
             end
         else
             begin
+				if (PC_wen)
+				  PC_r            <= PC_n;       
             barrier_mask_r <= barrier_mask_n;
             barrier_r      <= barrier_n;
             state_r        <= state_n;
+				instruction_r  <= instruction; 
+				PC_wen_r       <= PC_wen; 
             exception_o    <= exception_n;
             mem_stage_r    <= mem_stage_n;
         end
@@ -363,6 +406,21 @@ module core #(
     // The instruction write is just for network
     assign imem_wen  = net_imem_write_cmd;
     
+	 // Selection between network and core for instruction address
+	assign imem_addr = (net_imem_write_cmd) ? net_packet_i.net_addr
+                                       : PC_n;
+
+	// Selection between network and address included in the instruction which is exeuted
+	// Address for Reg. File is shorter than address of Ins. memory in network data
+	// Since network can write into immediate registers, the address is wider
+	// but for the destination register in an instruction the extra bits must be zero
+	assign wd_addr = (net_reg_write_cmd) 
+                 ? (net_packet_i.net_addr [0+:($bits(instruction.rs_imm))])
+                 : ({{($bits(instruction.rs_imm)-$bits(instruction.rd)){1'b0}}
+                    ,{mem_wb_r.instruction.rd}});
+
+	 
+	 
     // Instructions are shorter than 32 bits of network data
     assign net_instruction = net_packet_i.net_data [0+:($bits(instruction))];
     
@@ -385,7 +443,7 @@ module core #(
     // or by an an BAR instruction that is committing
     assign barrier_n = net_PC_write_cmd_IDLE
                     ? net_packet_i.net_data[0+:mask_length_gp]
-                    : ((instruction ==? kBAR) & ~stall)
+                    : ((fd_r.instruction ==? kBAR) & ~stall)
                         ? alu_result [0+:mask_length_gp]
                         : barrier_r;
     
@@ -407,5 +465,45 @@ module core #(
             exception_n = exception_o;
         end
     end
+	 
+	 always_ff @(posedge clk) begin 
+	   fd_r <= fd_n; 
+		nop_r = nop_n;
+	 end 
+	 always_comb begin 
+	   nop_n = 1'b0; 
+		
+		unique casez (instruction) 
+		    kBEQZ, kBNEQZ, kBGTZ, kBLTZ, kJALR, kLW, kLBU, kSW, kSB:
+		    nop_n = 1'b1;
+		default: begin 
+		end
+		endcase
+		
+		unique casez(fd_r.instruction)
+		   kBEQZ,kBNEQZ,kBGTZ, kBLTZ,kJALR, kLW, kLBU, kSW, kSB:
+		
+		    nop_n = 1'b0; 
+		default: begin
+		end 
+		endcase
+		end
+	 
+	 always_ff @(posedge clk) begin 
+	     mem_wb_r.instruction <= mem_wb_n.instruction;
+		  
+		  if(!stall) begin
+		      mem_wb_r.is_load_op <= is_load_op_c;
+				mem_wb_r.op_writes_rf <= op_writes_rf_c;
+				mem_wb_r.is_store_op <= is_store_op_c;
+				mem_wb_r.is_mem_op <= is_mem_op_c; 
+				mem_wb_r.is_byte_op <= is_byte_op_c;
+				from_mem_wb_i <= from_mem_i;
+				alu_result_mem_wb <= alu_result; 
+				pc_plus1_mem_wb <= pc_plus1; 
+				end
+			end
+				
+	 
     
 endmodule
